@@ -1,0 +1,35 @@
+button {
+  display: block;
+  overflow: hidden;
+  width: 100%;
+  padding: 0.625em 1.25em;
+  border: 2px solid black;
+  margin: 0;
+  background: transparent;
+  background-color: none;
+  color: #000;
+  cursor: pointer;
+  font-size: 0.875em;
+  -webkit-tap-highlight-color: transparent;
+  text-align: center;
+  text-decoration: none;
+  transition: 0.15s ease-out;
+  user-select: none;
+}
+
+button:hover {
+  background: #000;
+  color: #fff;
+}
+
+.a11y-contrast a11y-button-contrast button,
+.a11y-contrast a11y-button-font-size button {
+  border-color: #e3ff17;
+  color: #e3ff17;
+}
+
+.a11y-contrast a11y-button-contrast button:hover,
+.a11y-contrast a11y-button-font-size button:hover {
+  background: #e3ff17;
+  color: #000;
+}

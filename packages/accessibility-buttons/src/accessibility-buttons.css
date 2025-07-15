@@ -1,0 +1,13 @@
+input,
+textarea,
+select,
+button {
+  transition: all 0.6s linear;
+}
+
+.accessibility-font input,
+.accessibility-font textarea,
+.accessibility-font select,
+.accessibility-font button {
+  font-size: 1.0416rem;
+}
