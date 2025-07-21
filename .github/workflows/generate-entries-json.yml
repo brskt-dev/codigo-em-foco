@@ -5,11 +5,11 @@ on:
   push:
     paths:
       - "entries/**/*.html"
-    branches: [master]
+    branches: [main]
   pull_request:
     paths:
       - "entries/**/*.html"
-    branches: [master]
+    branches: [main]
 
   # Permite execução manual no GitHub
   workflow_dispatch:

@@ -1,9 +1,9 @@
 name: Validar Entradas do Desafio Código em Foco
 
 on:
-  # Executa na criação de pull requests para a branch master
+  # Executa na criação de pull requests para a branch main
   pull_request:
-    branches: [master]
+    branches: [main]
 
   # Permite execução manual no GitHub
   workflow_dispatch:
