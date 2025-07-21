@@ -1,16 +1,19 @@
-name: Validate One HTML Page Challenge Entries
+name: Validar Entradas do Desafio Código em Foco
 
 on:
+  # Executa na criação de pull requests para a branch master
   pull_request:
-    branches: [ master ]
+    branches: [master]
+
+  # Permite execução manual no GitHub
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'PR number to test'
+        description: "Número do PR para testar"
         required: true
         type: number
       dry_run:
-        description: 'Dry run - skip commenting on PR'
+        description: "Execução de teste - sem comentar no PR"
         required: false
         type: boolean
         default: false
@@ -18,67 +21,73 @@ on:
 jobs:
   validate-entries:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 2
-        ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/pull/{0}/merge', github.event.inputs.pr_number) || github.ref }}
-    
-    - name: Check if only entries files changed
-      id: check-files
-      run: |
-        # Get all changed files
-        changed_files=$(git diff --name-only HEAD~1 HEAD)
-        echo "All changed files:"
-        echo "$changed_files"
-        
-        # Check if all changed files are in allowed paths (no longer requiring entries.js)
-        allowed=true
-        while IFS= read -r file; do
-          if [[ ! "$file" =~ ^entries/ ]]; then
-            echo "❌ Non-entries file found: $file"
-            allowed=false
+      # Clona o repositório e foca no PR atual
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/pull/{0}/merge', github.event.inputs.pr_number) || github.ref }}
+
+      # Verifica se apenas arquivos da pasta entries/ foram alterados
+      - name: Verificar arquivos modificados
+        id: check-files
+        run: |
+          # Lista os arquivos modificados
+          changed_files=$(git diff --name-only HEAD~1 HEAD)
+          echo "Arquivos modificados:"
+          echo "$changed_files"
+
+          allowed=true
+          while IFS= read -r file; do
+            if [[ ! "$file" =~ ^entries/ ]]; then
+              echo "❌ Arquivo fora da pasta entries encontrado: $file"
+              allowed=false
+            fi
+          done <<< "$changed_files"
+
+          if [ "$allowed" = true ]; then
+            echo "✅ Todos os arquivos alterados pertencem à pasta entries"
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "🚫 O PR contém alterações fora de entries/, pulando validação"
+            echo "should_run=false" >> $GITHUB_OUTPUT
           fi
-        done <<< "$changed_files"
-        
-        if [ "$allowed" = true ]; then
-          echo "✅ All changed files are entries-related"
-          echo "should_run=true" >> $GITHUB_OUTPUT
-        else
-          echo "🚫 PR contains non-entries changes, skipping validation"
-          echo "should_run=false" >> $GITHUB_OUTPUT
-        fi
-    
-    - name: Set up Node.js
-      if: steps.check-files.outputs.should_run == 'true'
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22'
-    
-    - name: Install dependencies
-      if: steps.check-files.outputs.should_run == 'true'
-      run: |
-        npm install jsdom cheerio @octokit/rest
-    
-    - name: Get changed files
-      if: steps.check-files.outputs.should_run == 'true'
-      id: changed-files
-      run: |
-        echo "files=$(git diff --name-only HEAD~1 HEAD | grep -E '^entries/.*\.html?$' | tr '\n' ' ')" >> $GITHUB_OUTPUT
-    
-    - name: Run validation script
-      if: steps.check-files.outputs.should_run == 'true'
-      run: node .github/scripts/validate-entries.js
-      env:
-        CHANGED_FILES: ${{ steps.changed-files.outputs.files }}
-    
-    - name: Comment on PR
-      if: (success() || failure()) && steps.check-files.outputs.should_run == 'true'
-      run: node .github/scripts/comment-on-pr.js
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_REPOSITORY: ${{ github.repository }}
-        PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
-        DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }} 
+
+      # Configura o Node.js
+      - name: Configurar Node.js
+        if: steps.check-files.outputs.should_run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Instala dependências necessárias para os scripts
+      - name: Instalar dependências
+        if: steps.check-files.outputs.should_run == 'true'
+        run: |
+          npm install jsdom cheerio @octokit/rest
+
+      # Lista apenas arquivos HTML dentro de entries/
+      - name: Obter arquivos alterados
+        if: steps.check-files.outputs.should_run == 'true'
+        id: changed-files
+        run: |
+          echo "files=$(git diff --name-only HEAD~1 HEAD | grep -E '^entries/.*\.html?$' | tr '\n' ' ')" >> $GITHUB_OUTPUT
+
+      # Executa o script de validação
+      - name: Validar entradas
+        if: steps.check-files.outputs.should_run == 'true'
+        run: node .github/scripts/validate-entries.js
+        env:
+          CHANGED_FILES: ${{ steps.changed-files.outputs.files }}
+
+      # Comenta automaticamente no PR com os resultados da validação
+      - name: Comentar no PR
+        if: (success() || failure()) && steps.check-files.outputs.should_run == 'true'
+        run: node .github/scripts/comment-on-pr.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}

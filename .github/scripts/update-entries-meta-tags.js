@@ -2,31 +2,31 @@ const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
 
-// Read and parse the original entries.js file to get the metadata
+// Lê e interpreta o arquivo entries.js original para obter os metadados
 function getOriginalEntries() {
   try {
     const entriesContent = fs.readFileSync('entries.js', 'utf8');
     
-    // Extract the entries array using regex
+    // Extrai o array de entradas usando regex
     const entriesMatch = entriesContent.match(/const\s+entries\s*=\s*(\[[\s\S]*?\]);/);
     if (!entriesMatch) {
-      throw new Error('Could not find entries array in entries.js');
+      throw new Error('Não foi possível encontrar o array de entries no entries.js');
     }
     
-    // Use Function constructor to safely evaluate the array
+    // Usa o construtor Function para avaliar com segurança o array
     const entriesArrayString = entriesMatch[1];
     const entries = new Function('return ' + entriesArrayString)();
     
     return entries;
   } catch (error) {
-    console.error('Error reading entries.js:', error.message);
+    console.error('Erro ao ler o entries.js:', error.message);
     return [];
   }
 }
 
-// Add meta tags to HTML content using surgical string manipulation
+// Adiciona meta tags ao conteúdo HTML usando manipulação de string precisa
 function addMetaTags(content, entry) {
-  // First check what's missing using cheerio for parsing only
+  // Primeiro verifica o que está faltando usando cheerio apenas para parsing
   const $ = cheerio.load(content);
   
   const hasTitle = $('title').length > 0;
@@ -38,64 +38,64 @@ function addMetaTags(content, entry) {
   const hasViewport = $('meta[name="viewport"]').length > 0;
   const hasHead = $('head').length > 0;
   
-  // Build list of meta tags to add
+  // Monta lista de meta tags a serem adicionadas
   const metaTags = [];
   
-  // Add comment explaining the addition
-  metaTags.push('    <!-- Meta tags added due to entries.js deprecation on July 8th, 2025 -->');
+  // Adiciona comentário explicando a adição
+  metaTags.push('    <!-- Meta tags adicionadas devido à descontinuação do entries.js em 8 de julho de 2025 -->');
   
-  // Add viewport if missing (best practice)
+  // Adiciona viewport se estiver ausente (boa prática)
   if (!hasViewport) {
     metaTags.push('    <meta name="viewport" content="width=device-width, initial-scale=1.0">');
   }
   
-  // Don't add title meta tag if title element exists
+  // Não adiciona meta title se já houver título
   if (entry.title && !hasTitle && !hasMetaTitle) {
     metaTags.push(`    <meta name="title" content="${escapeHtml(entry.title)}">`);
   }
   
-  // Add description if missing
+  // Adiciona descrição se estiver ausente
   if (entry.description && !hasDescription) {
     metaTags.push(`    <meta name="description" content="${escapeHtml(entry.description)}">`);
   }
   
-  // Add author if missing
+  // Adiciona author se estiver ausente
   if (entry.author && !hasAuthor) {
     metaTags.push(`    <meta name="author" content="${escapeHtml(entry.author)}">`);
   }
   
-  // Add github if missing
+  // Adiciona github se estiver ausente
   if (entry.github && !hasGithub) {
     metaTags.push(`    <meta name="github" content="${escapeHtml(entry.github)}">`);
   }
   
-  // Add compatible browsers if missing
+  // Adiciona navegadores compatíveis se estiverem ausentes
   if (entry.compatibleBrowsers && entry.compatibleBrowsers.length > 0 && !hasCompatibleBrowsers) {
     const browsers = entry.compatibleBrowsers.join(', ');
     metaTags.push(`    <meta name="compatible-browsers" content="${escapeHtml(browsers)}">`);
   }
   
-  // If nothing to add, return original content
-  if (metaTags.length <= 1) { // Only comment, no actual meta tags
+  // Se nada for adicionado, retorna o conteúdo original
+  if (metaTags.length <= 1) { // Apenas o comentário, sem meta tags reais
     return content;
   }
   
   let updatedContent = content;
   
   if (!hasHead) {
-    // Create head section after opening html tag or at the beginning
+    // Cria a seção <head> após a tag <html> ou no início do documento
     const htmlTagMatch = updatedContent.match(/(<html[^>]*>)/i);
     if (htmlTagMatch) {
       const insertPos = htmlTagMatch.index + htmlTagMatch[0].length;
       const headSection = `\n<head>\n${metaTags.join('\n')}\n</head>`;
       updatedContent = updatedContent.slice(0, insertPos) + headSection + updatedContent.slice(insertPos);
     } else {
-      // No html tag, add head at the beginning
+      // Nenhuma tag <html>, insere head no início
       const headSection = `<head>\n${metaTags.join('\n')}\n</head>\n`;
       updatedContent = headSection + updatedContent;
     }
   } else {
-    // Find head tag and insert after it
+    // Encontra a tag <head> e insere após ela
     const headTagMatch = updatedContent.match(/(<head[^>]*>)/i);
     if (headTagMatch) {
       const insertPos = headTagMatch.index + headTagMatch[0].length;
@@ -107,7 +107,7 @@ function addMetaTags(content, entry) {
   return updatedContent;
 }
 
-// Simple HTML escape function
+// Função simples para escapar HTML
 function escapeHtml(text) {
   const map = {
     '&': '&amp;',
@@ -120,15 +120,15 @@ function escapeHtml(text) {
   return text.replace(/[&<>"']/g, function(m) { return map[m]; });
 }
 
-// Update all entry files with meta tags
+// Atualiza todos os arquivos de entrada com as meta tags necessárias
 function updateAllEntries() {
   const originalEntries = getOriginalEntries();
   if (originalEntries.length === 0) {
-    console.error('No entries found in entries.js');
+    console.error('Nenhuma entrada encontrada no entries.js');
     return;
   }
   
-  console.log(`Found ${originalEntries.length} entries in entries.js`);
+  console.log(`Encontradas ${originalEntries.length} entradas no entries.js`);
   
   let updatedCount = 0;
   let skippedCount = 0;
@@ -137,7 +137,7 @@ function updateAllEntries() {
     const filePath = path.join('entries', entry.filename);
     
     if (!fs.existsSync(filePath)) {
-      console.log(`❌ File not found: ${entry.filename}`);
+      console.log(`❌ Arquivo não encontrado: ${entry.filename}`);
       continue;
     }
     
@@ -145,25 +145,25 @@ function updateAllEntries() {
       const originalContent = fs.readFileSync(filePath, 'utf8');
       const updatedContent = addMetaTags(originalContent, entry);
       
-      // Only write if content changed
+      // Só grava se o conteúdo foi alterado
       if (originalContent !== updatedContent) {
         fs.writeFileSync(filePath, updatedContent, 'utf8');
-        console.log(`✅ Updated: ${entry.filename}`);
+        console.log(`✅ Atualizado: ${entry.filename}`);
         updatedCount++;
       } else {
-        console.log(`⏭️  Skipped: ${entry.filename} (already has meta tags)`);
+        console.log(`⏭️  Ignorado: ${entry.filename} (já possui meta tags)`);
         skippedCount++;
       }
     } catch (error) {
-      console.error(`❌ Error updating ${entry.filename}:`, error.message);
+      console.error(`❌ Erro ao atualizar ${entry.filename}:`, error.message);
     }
   }
   
-  console.log(`\n📊 Summary:`);
-  console.log(`   Updated: ${updatedCount} files`);
-  console.log(`   Skipped: ${skippedCount} files`);
-  console.log(`   Total:   ${originalEntries.length} files`);
+  console.log(`\n📊 Resumo:`);
+  console.log(`   Atualizados: ${updatedCount} arquivos`);
+  console.log(`   Ignorados:  ${skippedCount} arquivos`);
+  console.log(`   Total:      ${originalEntries.length} arquivos`);
 }
 
-// Run the update
-updateAllEntries(); 
+// Executa a atualização
+updateAllEntries();

@@ -1,87 +1,94 @@
-const fs = require('fs');
-const path = require('path');
-const { JSDOM } = require('jsdom');
-const cheerio = require('cheerio');
+const fs = require("fs");
+const path = require("path");
+const { JSDOM } = require("jsdom");
+const cheerio = require("cheerio");
 
-const MAX_FILE_SIZE = 1024 * 1024; // 1MB in bytes
+const MAX_FILE_SIZE = 1024 * 1024; // 1MB em bytes
 const results = {};
 
-// Validate file size (must be < 1MB)
+// Valida tamanho do arquivo (deve ser < 1MB)
 function validateFileSize(filePath) {
   const stats = fs.statSync(filePath);
   const fileSizeInBytes = stats.size;
-  
+
   if (fileSizeInBytes >= MAX_FILE_SIZE) {
-    return `File size (${(fileSizeInBytes / 1024 / 1024).toFixed(2)}MB) exceeds 1MB limit`;
+    return `Tamanho do arquivo (${(fileSizeInBytes / 1024 / 1024).toFixed(
+      2
+    )}MB) excede o limite de 1MB`;
   }
-  
+
   return null;
 }
 
-// Validate that it's a single HTML file
+// Valida se é um único arquivo HTML
 function validateSingleHtmlFile(filePath, content) {
   const issues = [];
-  
-  // Check file extension
+
+  // Verifica a extensão do arquivo
   if (!filePath.match(/\.html?$/i)) {
-    issues.push('File must have .html or .htm extension');
+    issues.push("O arquivo deve ter extensão .html ou .htm");
   }
 
-  // Check for basic HTML structure
-  if (!content.includes('<html') && !content.includes('<!DOCTYPE')) {
-    issues.push('File must contain valid HTML structure');
+  // Verifica se tem estrutura básica de HTML
+  if (!content.includes("<html") && !content.includes("<!DOCTYPE")) {
+    issues.push("O arquivo deve conter uma estrutura HTML válida");
   }
 
   return issues;
 }
 
-// Check if URL is external
+// Verifica se uma URL é externa
 function isExternalUrl(url) {
   try {
     const urlObj = new URL(url);
-    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+    return urlObj.protocol === "http:" || urlObj.protocol === "https:";
   } catch (e) {
-    // If URL parsing fails, it's likely a relative path
+    // Se falhar o parsing, provavelmente é caminho relativo
     return false;
   }
 }
 
-// Validate no external file imports
+// Valida ausência de importações externas
 function validateNoExternalImports(content) {
   const issues = [];
   const $ = cheerio.load(content);
 
-  // Check for external stylesheets
+  // Verifica estilos externos
   $('link[rel="stylesheet"]').each((i, el) => {
-    const href = $(el).attr('href');
+    const href = $(el).attr("href");
     if (href && isExternalUrl(href)) {
-      issues.push(`External stylesheet found: ${href}`);
+      issues.push(`Estilo externo encontrado: ${href}`);
     }
   });
 
-  // Check for external scripts
-  $('script[src]').each((i, el) => {
-    const src = $(el).attr('src');
+  // Verifica scripts externos
+  $("script[src]").each((i, el) => {
+    const src = $(el).attr("src");
     if (src && isExternalUrl(src)) {
-      issues.push(`External script found: ${src}`);
+      issues.push(`Script externo encontrado: ${src}`);
     }
   });
 
-  // Check for external images
-  $('img[src]').each((i, el) => {
-    const src = $(el).attr('src');
-    if (src && isExternalUrl(src) && !src.startsWith('data:')) {
-      issues.push(`External image found: ${src}`);
+  // Verifica imagens externas
+  $("img[src]").each((i, el) => {
+    const src = $(el).attr("src");
+    if (src && isExternalUrl(src) && !src.startsWith("data:")) {
+      issues.push(`Imagem externa encontrada: ${src}`);
     }
   });
 
-  // Check for other external resources
-  $('[src], [href]').each((i, el) => {
-    const src = $(el).attr('src') || $(el).attr('href');
-    if (src && isExternalUrl(src) && !src.startsWith('data:') && !src.startsWith('#')) {
+  // Verifica outros recursos externos
+  $("[src], [href]").each((i, el) => {
+    const src = $(el).attr("src") || $(el).attr("href");
+    if (
+      src &&
+      isExternalUrl(src) &&
+      !src.startsWith("data:") &&
+      !src.startsWith("#")
+    ) {
       const tagName = el.tagName.toLowerCase();
-      if (!['link', 'script', 'img', 'a'].includes(tagName)) {
-        issues.push(`External resource found in ${tagName}: ${src}`);
+      if (!["link", "script", "img", "a"].includes(tagName)) {
+        issues.push(`Recurso externo encontrado na tag ${tagName}: ${src}`);
       }
     }
   });
@@ -89,34 +96,35 @@ function validateNoExternalImports(content) {
   return issues;
 }
 
-// Basic check if match is in comment or string (not perfect but helps)
+// Verificação básica se o trecho está em comentário ou string (não é 100% precisa)
 function isInCommentOrString(content, match) {
   const index = content.indexOf(match);
   if (index === -1) return false;
-  
+
   const beforeMatch = content.substring(0, index);
-  const lines = beforeMatch.split('\n');
+  const lines = beforeMatch.split("\n");
   const currentLine = lines[lines.length - 1];
-  
-  // Check if it's in a single-line comment
-  if (currentLine.includes('//')) {
-    const commentIndex = currentLine.indexOf('//');
+
+  // Verifica se está em comentário de linha
+  if (currentLine.includes("//")) {
+    const commentIndex = currentLine.indexOf("//");
     const matchIndex = currentLine.length - (content.length - index);
     if (matchIndex > commentIndex) return true;
   }
-  
-  // Basic check for strings (not perfect due to nested quotes)
-  const inString = (currentLine.match(/"/g) || []).length % 2 === 1 ||
-                  (currentLine.match(/'/g) || []).length % 2 === 1;
-  
+
+  // Verificação básica de string (pode falhar com aspas aninhadas)
+  const inString =
+    (currentLine.match(/"/g) || []).length % 2 === 1 ||
+    (currentLine.match(/'/g) || []).length % 2 === 1;
+
   return inString;
 }
 
-// Validate no network requests in JavaScript
+// Valida ausência de requisições de rede em scripts JS
 function validateNoNetworkRequests(content) {
   const issues = [];
-  
-  // Common patterns for network requests
+
+  // Padrões comuns de chamadas de rede
   const networkPatterns = [
     /fetch\s*\(/gi,
     /XMLHttpRequest/gi,
@@ -126,16 +134,16 @@ function validateNoNetworkRequests(content) {
     /\$\.post\s*\(/gi,
     /new\s+WebSocket\s*\(/gi,
     /navigator\.sendBeacon\s*\(/gi,
-    /import\s*\(/gi, // Dynamic imports
+    /import\s*\(/gi, // imports dinâmicos
   ];
 
-  networkPatterns.forEach(pattern => {
+  networkPatterns.forEach((pattern) => {
     const matches = content.match(pattern);
     if (matches) {
-      matches.forEach(match => {
-        // Exclude comments and string literals where possible
+      matches.forEach((match) => {
+        // Ignora se estiver em comentário ou string
         if (!isInCommentOrString(content, match)) {
-          issues.push(`Potential network request found: ${match.trim()}`);
+          issues.push(`Possível requisição de rede detectada: ${match.trim()}`);
         }
       });
     }
@@ -144,148 +152,158 @@ function validateNoNetworkRequests(content) {
   return issues;
 }
 
-// Validate required meta tags exist in HTML
+// Valida existência de meta tags obrigatórias
 function validateRequiredMetaTags(content) {
   const issues = [];
   const $ = cheerio.load(content);
-  
-  // Check for title (can be from meta tag or title element)
-  const metaTitle = $('meta[name="title"]').attr('content');
-  const titleElement = $('title').text();
-  
+
+  // Verifica <title> ou <meta name="title">
+  const metaTitle = $('meta[name="title"]').attr("content");
+  const titleElement = $("title").text();
+
   if (!metaTitle && !titleElement) {
-    issues.push('Missing title: Add either <meta name="title" content="Your Title"> or <title>Your Title</title>');
+    issues.push(
+      'Título ausente: Adicione <meta name="title" content="Seu Título"> ou <title>Seu Título</title>'
+    );
   }
-  
-  // Check for description
-  const description = $('meta[name="description"]').attr('content');
+
+  // Verifica <meta name="description">
+  const description = $('meta[name="description"]').attr("content");
   if (!description) {
-    issues.push('Missing description: Add <meta name="description" content="Brief description of your entry">');
+    issues.push(
+      'Descrição ausente: Adicione <meta name="description" content="Breve descrição do seu projeto">'
+    );
   }
-  
-  // Check for author
-  const author = $('meta[name="author"]').attr('content');
+
+  // Verifica <meta name="author">
+  const author = $('meta[name="author"]').attr("content");
   if (!author) {
-    issues.push('Missing author: Add <meta name="author" content="Your Name">');
+    issues.push(
+      'Autor ausente: Adicione <meta name="author" content="Seu Nome">'
+    );
   }
-  
-  // GitHub username is optional but recommended
-  const github = $('meta[name="github"]').attr('content');
+
+  // GitHub é opcional, mas recomendado
+  const github = $('meta[name="github"]').attr("content");
   if (!github) {
-    issues.push('Recommended: Add <meta name="github" content="your-github-username"> to link to your profile');
+    issues.push(
+      'Recomendado: Adicione <meta name="github" content="seu-usuario-github"> para linkar seu perfil'
+    );
   }
-  
+
   return issues;
 }
 
-// Validate HTML syntax and structure
+// Valida estrutura e sintaxe do HTML
 function validateHtmlSyntax(content) {
   const issues = [];
-  
+
   try {
     const dom = new JSDOM(content);
-    // If JSDOM can parse it, it's likely valid HTML
+    // Se o JSDOM conseguir parsear, o HTML provavelmente é válido
   } catch (error) {
-    issues.push(`HTML syntax error: ${error.message}`);
+    issues.push(`Erro de sintaxe HTML: ${error.message}`);
   }
 
-  // Check for unclosed script tags
+  // Verifica tags <script> não fechadas
   const scriptMatches = content.match(/<script[^>]*>/gi) || [];
   const scriptCloses = content.match(/<\/script>/gi) || [];
-  
+
   if (scriptMatches.length !== scriptCloses.length) {
-    issues.push('Unclosed script tags detected');
+    issues.push("Tags <script> não fechadas detectadas");
   }
 
-  // Check for unclosed style tags
+  // Verifica tags <style> não fechadas
   const styleMatches = content.match(/<style[^>]*>/gi) || [];
   const styleCloses = content.match(/<\/style>/gi) || [];
-  
+
   if (styleMatches.length !== styleCloses.length) {
-    issues.push('Unclosed style tags detected');
+    issues.push("Tags <style> não fechadas detectadas");
   }
 
   return issues;
 }
 
-// Main validation function
+// Função principal de validação
 function validateEntry(filePath) {
   const issues = [];
   const filename = path.basename(filePath);
-  
-  console.log(`Validating: ${filename}`);
 
-  // Check if file exists
+  console.log(`Validando: ${filename}`);
+
+  // Verifica se o arquivo existe
   if (!fs.existsSync(filePath)) {
-    return [`File does not exist: ${filePath}`];
+    return [`Arquivo não existe: ${filePath}`];
   }
 
-  // Read file content
+  // Lê o conteúdo do arquivo
   let content;
   try {
-    content = fs.readFileSync(filePath, 'utf8');
+    content = fs.readFileSync(filePath, "utf8");
   } catch (error) {
-    return [`Error reading file: ${error.message}`];
+    return [`Erro ao ler o arquivo: ${error.message}`];
   }
 
-  // 1. Validate file size
+  // 1. Valida tamanho
   const sizeIssue = validateFileSize(filePath);
   if (sizeIssue) issues.push(sizeIssue);
 
-  // 2. Validate single HTML file
+  // 2. Valida extensão e estrutura
   issues.push(...validateSingleHtmlFile(filePath, content));
 
-  // 3. Validate HTML syntax
+  // 3. Valida sintaxe HTML
   issues.push(...validateHtmlSyntax(content));
 
-  // 4. Validate no external imports
+  // 4. Valida ausência de importações externas
   issues.push(...validateNoExternalImports(content));
 
-  // 5. Validate no network requests
+  // 5. Valida ausência de requisições de rede
   issues.push(...validateNoNetworkRequests(content));
 
-  // 6. Validate required meta tags
+  // 6. Valida metatags obrigatórias
   issues.push(...validateRequiredMetaTags(content));
 
   return issues;
 }
 
-// Run validation on all changed files
+// Executa validação em todos os arquivos modificados
 function validateChangedFiles() {
-  const changedFiles = process.env.CHANGED_FILES ? process.env.CHANGED_FILES.trim().split(' ') : [];
-  
-  console.log('Changed files:', changedFiles);
-  
+  const changedFiles = process.env.CHANGED_FILES
+    ? process.env.CHANGED_FILES.trim().split(" ")
+    : [];
+
+  console.log("Arquivos modificados:", changedFiles);
+
   let hasErrors = false;
 
   for (const file of changedFiles) {
     if (!file) continue;
-    
-    if (file.startsWith('entries/') && file.match(/\.html?$/)) {
+
+    if (file.startsWith("entries/") && file.match(/\.html?$/)) {
       const issues = validateEntry(file);
       results[file] = issues;
-      
+
       if (issues.length > 0) {
         hasErrors = true;
-        console.log(`❌ ${file}: ${issues.length} issues found`);
-        issues.forEach(issue => console.log(`   - ${issue}`));
+        console.log(`❌ ${file}: ${issues.length} problemas encontrados`);
+        issues.forEach((issue) => console.log(`   - ${issue}`));
       } else {
-        console.log(`✅ ${file}: No issues found`);
+        console.log(`✅ ${file}: Nenhum problema encontrado`);
       }
     }
   }
 
-  // Write results for GitHub Action to use
-  fs.writeFileSync('validation-results.json', JSON.stringify(results, null, 2));
+  // Salva resultado para uso na GitHub Action
+  fs.writeFileSync("validation-results.json", JSON.stringify(results, null, 2));
 
   if (hasErrors) {
-    console.log('\n❌ Validation failed');
+    console.log("\n❌ Validação falhou");
     process.exit(1);
   } else {
-    console.log('\n✅ All validations passed');
+    console.log("\n✅ Todas as validações passaram");
     process.exit(0);
   }
 }
 
-// Run validation
-validateChangedFiles(); 
+// Executa validação
+validateChangedFiles();

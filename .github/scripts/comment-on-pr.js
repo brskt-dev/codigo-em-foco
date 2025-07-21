@@ -1,7 +1,7 @@
 const fs = require('fs');
 const { Octokit } = require('@octokit/rest');
 
-// Get environment variables
+// Obter variáveis de ambiente
 const token = process.env.GITHUB_TOKEN;
 const repo = process.env.GITHUB_REPOSITORY.split('/');
 const owner = repo[0];
@@ -25,27 +25,28 @@ async function commentOnPR() {
   try {
     let results = {};
     let hasErrors = false;
-    
+
+    // Carregar resultados de validação se existirem
     if (fs.existsSync('validation-results.json')) {
       results = JSON.parse(fs.readFileSync('validation-results.json', 'utf8'));
       hasErrors = Object.values(results).some(issues => issues.length > 0);
     }
-    
-    // Determine overall status
+
+    // Determinar status geral
     const status = hasErrors ? '🚫 Entry Validation Failed' : '✅ Entry Validation Passed';
     let comment = `## ${status}\n\n`;
-    
-    // Add requirements checklist
+
+    // Adicionar checklist de requisitos
     comment += '### Requirements Checklist:\n\n';
-    
-    // Check each requirement across all files
+
+    // Verificar cada requisito em todos os arquivos
     let fileSizePass = true;
     let htmlStructurePass = true;
     let noExternalImportsPass = true;
     let noNetworkRequestsPass = true;
     let htmlSyntaxPass = true;
     let entryRegisteredPass = true;
-    
+
     for (const [file, issues] of Object.entries(results)) {
       issues.forEach(issue => {
         if (issue.includes('File size') && issue.includes('exceeds')) fileSizePass = false;
@@ -56,15 +57,15 @@ async function commentOnPR() {
         if (issue.includes('Entry not found') || issue.includes('entries.js')) entryRegisteredPass = false;
       });
     }
-    
+
     comment += `- ${fileSizePass ? '✅' : '❌'} File must be less than 1MB\n`;
     comment += `- ${htmlStructurePass ? '✅' : '❌'} Valid HTML file structure\n`;
     comment += `- ${noExternalImportsPass ? '✅' : '❌'} No external file imports (images, CSS, JS)\n`;
     comment += `- ${noNetworkRequestsPass ? '✅' : '❌'} No network requests\n`;
     comment += `- ${htmlSyntaxPass ? '✅' : '❌'} Valid HTML syntax\n`;
     comment += `- ${entryRegisteredPass ? '✅' : '❌'} Entry registered in entries.js\n\n`;
-    
-    // Add detailed issues if any exist
+
+    // Adicionar lista de problemas se existirem
     if (hasErrors) {
       comment += '### Issues Found:\n\n';
       for (const [file, issues] of Object.entries(results)) {
@@ -80,8 +81,8 @@ async function commentOnPR() {
     } else {
       comment += 'All entries meet the One HTML Page Challenge requirements! 🎉';
     }
-    
-    // Log the comment for dry runs or post it
+
+    // Logar o comentário ou enviá-lo de fato
     if (isDryRun) {
       console.log('Dry run mode - comment would be:');
       console.log('---');
@@ -97,18 +98,18 @@ async function commentOnPR() {
       });
       console.log('Comment posted successfully');
     }
-    
-    // Exit with error code if validation failed
+
+    // Finalizar com erro se falhou
     if (hasErrors) {
       process.exit(1);
     } else {
       process.exit(0);
     }
-    
+
   } catch (error) {
     console.error('Error posting comment:', error.message);
     process.exit(1);
   }
 }
 
-commentOnPR(); 
+commentOnPR();

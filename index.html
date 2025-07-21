@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-br">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -68,7 +68,7 @@
 
       .card-text:nth-of-type(2)::before {
         display: inline-block;
-        content: "Supported in:";
+        content: "Compatível com:";
         margin-right: 0.5em;
       }
 
@@ -95,7 +95,7 @@
           <div class="jumbotron">
             <img
               src="./codigo-em-foco-logo.png"
-              alt="One Html Page Challenge"
+              alt="Código em Foco"
               fetchpriority="high"
               class="logo"
             />
@@ -118,7 +118,7 @@
             <input
               type="text"
               class="form-control"
-              placeholder="Search"
+              placeholder="Buscar"
               aria-label="Search"
               aria-describedby="addon-wrapping"
               id="search"
@@ -216,16 +216,6 @@
                 authorSubtitle.appendChild(sponsorEmoji);
               }
 
-              // add an owner tag for myself
-              if (author.includes("Christopher Powroznik")) {
-                const ownerEmoji = document.createElement("a");
-                const ownerEmojiNode = document.createTextNode(" 👑️");
-                ownerEmoji.href = "https://github.com/Metroxe";
-                ownerEmoji.title = "Owner";
-                ownerEmoji.appendChild(ownerEmojiNode);
-                authorSubtitle.appendChild(ownerEmoji);
-              }
-
               body.appendChild(authorSubtitle);
             }
 
@@ -270,9 +260,9 @@
 
             // Source Code Link
             const sourceCodeButton = document.createElement("a");
-            const sourceCodeNode = document.createTextNode("Source");
+            const sourceCodeNode = document.createTextNode("Código Fonte");
             sourceCodeButton.className = "btn btn-secondary btn-md";
-            sourceCodeButton.href = `https://github.com/Metroxe/one-html-page-challenge/blob/master/entries/${filename}`;
+            sourceCodeButton.href = `https://github.com/brskt-dev/codigo-em-foco/blob/main/entries/${filename}`;
             sourceCodeButton.appendChild(sourceCodeNode);
             sourceCodeButton.setAttribute("target", "_blank");
             group1.appendChild(sourceCodeButton);
